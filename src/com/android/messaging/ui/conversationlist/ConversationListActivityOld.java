@@ -28,9 +28,13 @@ import com.android.messaging.util.Trace;
 
 import androidx.appcompat.app.ActionBar;
 
-public class ConversationListActivity extends AbstractConversationListActivity {
+import android.util.Log;
+
+public class ConversationListActivityOld extends AbstractConversationListActivity {
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
+
+		Log.d("hello", "onCreate");
         Trace.beginSection("ConversationListActivity.onCreate");
         setTheme(R.style.BugleTheme_ConversationListActivity);
         super.onCreate(savedInstanceState);

@@ -3,6 +3,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    alias(libs.plugins.kotlin.compose)
 }
 
 java {
@@ -39,6 +40,7 @@ android {
     buildFeatures {
         buildConfig = true
         resValues = true
+        compose = true
     }
 
     sourceSets.getByName("main") {
@@ -99,6 +101,14 @@ dependencies {
     implementation("com.google.guava:guava:33.4.8-android")
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.52")
     implementation("com.google.code.findbugs:jsr305:3.0.2")
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.material3)
 
     implementation(project(":lib:platform_frameworks_opt_chips"))
     implementation(project(":lib:platform_frameworks_opt_photoviewer"))
