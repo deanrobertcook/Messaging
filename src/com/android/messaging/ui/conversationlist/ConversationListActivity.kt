@@ -1,6 +1,7 @@
 package com.android.messaging.ui.conversationlist
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,6 +36,7 @@ import android.util.Log
 import com.android.messaging.util.LogUtil
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -50,10 +52,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.android.messaging.ui.UIIntents
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this);
@@ -85,7 +89,7 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
         } while (cursor.moveToNext())
 
         setContent {
-            ConversationList(listItems, this)
+            ConversationList(listItems, this, this)
         }
     }
 
@@ -135,7 +139,7 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: HostInterface) {
+fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: HostInterface, context: Context) {
     MainTheme {
         Scaffold(
             topBar = {
@@ -171,6 +175,13 @@ fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: H
                         }
                     }
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = {
+                    UIIntents.get().launchCreateNewConversationActivity(context, null);
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
+                }
             },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
