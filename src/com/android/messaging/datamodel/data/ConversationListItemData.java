@@ -37,6 +37,7 @@ import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.android.messaging.util.LogUtil;
 /**
  * Class wrapping the conversation list view used to display each item in conversation list
  */
@@ -79,6 +80,7 @@ public class ConversationListItemData {
     }
 
     public void bind(final Cursor cursor, final boolean ignoreDraft) {
+        LogUtil.v(LogUtil.BUGLE_TAG, "position: " + cursor.getPosition());
         mConversationId = cursor.getString(INDEX_ID);
         mName = cursor.getString(INDEX_CONVERSATION_NAME);
         mIcon = cursor.getString(INDEX_CONVERSATION_ICON);

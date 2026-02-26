@@ -83,6 +83,7 @@ public class ConversationListData extends BindableData {
     private class ConversationListLoaderCallbacks extends CursorLoaderCallbacks {
         @Override
         public Loader<Cursor> onCreateLoader(final int id, final Bundle args) {
+            LogUtil.v(TAG, "onCreateLoader");
             final String bindingId = args.getString(BINDING_ID);
             Loader<Cursor> loader = null;
             // Check if data still bound to the requesting ui element
@@ -117,6 +118,7 @@ public class ConversationListData extends BindableData {
          */
         @Override
         public void onLoadFinish(final Loader<Cursor> generic, final Cursor data) {
+            LogUtil.v(TAG, "onLoadFinish");
             final BoundCursorLoader loader = (BoundCursorLoader) generic;
             if (isBound(loader.getBindingId())) {
                 switch (loader.getId()) {
@@ -146,6 +148,7 @@ public class ConversationListData extends BindableData {
          */
         @Override
         public void onLoaderReset(final Loader<Cursor> generic) {
+            LogUtil.v(TAG, "onLoaderReset");
             final BoundCursorLoader loader = (BoundCursorLoader) generic;
             if (isBound(loader.getBindingId())) {
                 switch (loader.getId()) {
@@ -169,6 +172,7 @@ public class ConversationListData extends BindableData {
 
     public void init(final LoaderManager loaderManager,
             final BindingBase<ConversationListData> binding) {
+        LogUtil.v(TAG, "init: " + binding.getBindingId());
         mArgs = new Bundle();
         mArgs.putString(BINDING_ID, binding.getBindingId());
         mLoaderManager = loaderManager;

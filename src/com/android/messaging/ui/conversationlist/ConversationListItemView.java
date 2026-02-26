@@ -61,6 +61,7 @@ import java.util.List;
 import androidx.core.text.BidiFormatter;
 import androidx.core.text.TextDirectionHeuristicsCompat;
 
+import com.android.messaging.util.LogUtil;
 /**
  * The view for a single entry in a conversation list.
  */
@@ -111,7 +112,7 @@ public class ConversationListItemView extends FrameLayout implements OnClickList
         }
     };
 
-    private final ConversationListItemData mData;
+    private ConversationListItemData mData;
 
     private int mAnimatingCount;
     private ViewGroup mSwipeableContainer;
@@ -359,10 +360,14 @@ public class ConversationListItemView extends FrameLayout implements OnClickList
      * entry.
      */
     public void bind(final Cursor cursor, final HostInterface hostInterface) {
+        mData.bind(cursor);
+		this.bind(mData, hostInterface);
+	}
+
+	public void bind(ConversationListItemData data, final HostInterface hostInterface) {
         // Update our UI model
         mHostInterface = hostInterface;
-        mData.bind(cursor);
-
+		mData = data;
         resetAnimatingState();
 
         mSwipeableContainer.setOnClickListener(this);
