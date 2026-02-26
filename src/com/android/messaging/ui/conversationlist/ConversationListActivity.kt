@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.messaging.ui.theme.ComposeTutorialTheme
+import com.android.messaging.ui.theme.MainTheme
 import com.android.messaging.ui.ContactIconView
 import com.android.messaging.R
 
@@ -35,6 +35,25 @@ import android.util.Log
 import com.android.messaging.util.LogUtil
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this);
@@ -55,10 +74,6 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
      * ConversationListDataListener
      **/
     override fun onConversationListCursorUpdated(data: ConversationListData, cursor: Cursor) {
-        Log.d(
-            LogUtil.BUGLE_TAG,
-            "onConversationListCursorUpdated " + cursor.getColumnCount() + ": " + cursor.getCount()
-        )
         if (!cursor.moveToFirst()) {
             // TODO: empty list
             return
@@ -70,22 +85,7 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
         } while (cursor.moveToNext())
 
         setContent {
-            ComposeTutorialTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LazyColumn {
-                        items(listItems) { listItem ->
-                            AndroidView({ context ->
-                                val view = LayoutInflater.from(context).inflate(
-                                    R.layout.conversation_list_item_view, null, false
-                                ) as ConversationListItemView
-                                view.bind(listItem, this@ConversationListActivity)
-                                view
-                            })
-
-                        }
-                    }
-                }
-            }
+            ConversationList(listItems, this)
         }
     }
 
@@ -130,6 +130,66 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
     override fun isSelectionMode(): Boolean {
         Log.d(LogUtil.BUGLE_TAG, "isSelectionMode")
         return false
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: HostInterface) {
+    MainTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    colors = topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    title = {
+                        Text("Messaging")
+                    },
+                    actions = {
+                        var expanded by remember { mutableStateOf(false) }
+                        IconButton(onClick = { expanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Archived") },
+                                onClick = {
+                                    UIIntents.get().launchArchivedConversationsActivity(context)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Settings") },
+                                onClick = {
+                                    UIIntents.get().launchSettingsActivity(context)
+                                }
+                            )
+                        }
+                    }
+                )
+            },
+            modifier = Modifier.fillMaxSize()
+        ) { innerPadding ->
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                items(listItems) { listItem ->
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        factory = { context ->
+                            val view = LayoutInflater.from(context).inflate(
+                                R.layout.conversation_list_item_view, null, false
+                            ) as ConversationListItemView
+                            view.bind(listItem, hostInterface)
+                            view
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
