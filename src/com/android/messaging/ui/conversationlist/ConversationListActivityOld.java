@@ -33,8 +33,6 @@ import android.util.Log;
 public class ConversationListActivityOld extends AbstractConversationListActivity {
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
-
-		Log.d("hello", "onCreate");
         Trace.beginSection("ConversationListActivity.onCreate");
         setTheme(R.style.BugleTheme_ConversationListActivity);
         super.onCreate(savedInstanceState);
