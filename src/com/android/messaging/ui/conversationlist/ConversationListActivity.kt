@@ -9,9 +9,11 @@ import android.view.LayoutInflater
 import android.net.Uri
 import android.graphics.Rect
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Scaffold
@@ -89,6 +91,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.paint
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this)
@@ -300,6 +309,32 @@ fun ConversationList(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
+            if (uiState.items.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .paint(
+                                painter = painterResource(id = R.drawable.ic_oobe_conv_list),
+                                contentScale = ContentScale.Crop
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Once you start a new conversation, you'll see it listed here",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                return@Scaffold
+            }
             if (showDeleteDialog) {
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
