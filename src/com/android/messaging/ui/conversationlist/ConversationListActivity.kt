@@ -31,6 +31,7 @@ import com.android.messaging.datamodel.data.ConversationListItemData
 import com.android.messaging.datamodel.DataModel
 import com.android.messaging.datamodel.data.ConversationListData.ConversationListDataListener
 import com.android.messaging.datamodel.action.UpdateConversationArchiveStatusAction
+import com.android.messaging.datamodel.action.DeleteConversationAction
 import com.android.messaging.ui.conversationlist.ConversationListItemView.HostInterface
 import com.android.messaging.ui.SnackBarInteraction
 import android.database.Cursor
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
@@ -85,6 +87,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this)
@@ -186,6 +190,10 @@ class ConversationListViewModel : ViewModel() {
             state.copy(selectedIds = newSelected)
         }
     }
+
+    fun clearSelection() {
+        _uiState.update { state -> state.copy(selectedIds = emptySet()) }
+    }
 }
 
 data class ConversationListState(
@@ -203,6 +211,7 @@ fun ConversationList(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     MainTheme {
         Scaffold(
@@ -213,7 +222,19 @@ fun ConversationList(
                         titleContentColor = MaterialTheme.colorScheme.primary,
                     ),
                     title = {
-                        Text("Messaging")
+                        if (uiState.selectedIds.isEmpty()) {
+                            Text("Messaging")
+                        }
+                    },
+                    navigationIcon = {
+                        if (!uiState.selectedIds.isEmpty()) {
+                            IconButton(onClick = { viewModel.clearSelection() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close"
+                                )
+                            }
+                        }
                     },
                     actions = {
                         if (uiState.selectedIds.isEmpty()) {
@@ -243,14 +264,16 @@ fun ConversationList(
                                 for (conversationId in uiState.selectedIds) {
                                     UpdateConversationArchiveStatusAction.archiveConversation(conversationId)
                                 }
+                                val idsToArchive = uiState.selectedIds
+                                viewModel.clearSelection()
                                 scope.launch {
                                     val result = snackbarHostState.showSnackbar(
-                                        message = "" + uiState.selectedIds.size + " archived",
+                                        message = "${idsToArchive.size} archived",
                                         actionLabel = "Undo",
                                         duration = SnackbarDuration.Short
                                     )
                                     if (result == SnackbarResult.ActionPerformed) {
-                                        for (conversationId in uiState.selectedIds) {
+                                        for (conversationId in idsToArchive) {
                                             UpdateConversationArchiveStatusAction.unarchiveConversation(conversationId)
                                         }
                                     }
@@ -259,9 +282,7 @@ fun ConversationList(
                                 Icon(Icons.Default.Archive, contentDescription = "Archive")
                             }
 
-                            IconButton(onClick = {
-
-                            }) {
+                            IconButton(onClick = { showDeleteDialog = true }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }
 
@@ -279,6 +300,39 @@ fun ConversationList(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = {
+                        val text = if (uiState.selectedIds.size > 1) {
+                            "Delete ${uiState.selectedIds.size} conversations?"
+                        } else {
+                            "Delete this conversation?"
+                        }
+                        Text(text)
+                    },
+                    text = { Text("This action cannot be undone.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            uiState.items
+                                .filter { it.getConversationId() in uiState.selectedIds }
+                                .map { Pair(it.getConversationId(), it.getTimestamp()) }
+                                .forEach { (id, timestamp) ->
+                                    DeleteConversationAction.deleteConversation(id, timestamp)
+                                }
+                            showDeleteDialog = false
+                            viewModel.clearSelection()
+                        }) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 items(uiState.items, key = { it.getConversationId() }) { listItem ->
                     val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
