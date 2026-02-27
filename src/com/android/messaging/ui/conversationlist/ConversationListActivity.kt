@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,7 +30,8 @@ import com.android.messaging.datamodel.data.ConversationListData
 import com.android.messaging.datamodel.data.ConversationListItemData
 import com.android.messaging.datamodel.DataModel
 import com.android.messaging.datamodel.data.ConversationListData.ConversationListDataListener
-import com.android.messaging.ui.conversationlist.ConversationListItemView.HostInterface;
+import com.android.messaging.datamodel.action.UpdateConversationArchiveStatusAction
+import com.android.messaging.ui.conversationlist.ConversationListItemView.HostInterface
 import com.android.messaging.ui.SnackBarInteraction
 import android.database.Cursor
 import android.util.Log
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,11 +56,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
+import androidx.compose.material3.SwipeToDismissBoxValue.Settled
+import androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.android.messaging.ui.UIIntents
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this);
@@ -186,18 +196,51 @@ fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: H
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                items(listItems) { listItem ->
-                    AndroidView(
-                        modifier = Modifier
-                            .fillMaxSize(),
-                        factory = { context ->
-                            val view = LayoutInflater.from(context).inflate(
-                                R.layout.conversation_list_item_view, null, false
-                            ) as ConversationListItemView
-                            view.bind(listItem, hostInterface)
-                            view
+                items(listItems, key = { it.getConversationId() }) { listItem ->
+                    val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = {
+                            if (it == EndToStart) {
+                                UpdateConversationArchiveStatusAction.archiveConversation(listItem.getConversationId())
+                                true
+                            } else false
                         }
                     )
+                    SwipeToDismissBox(
+                        state = swipeToDismissBoxState,
+                        backgroundContent = {
+                            when (swipeToDismissBoxState.dismissDirection) {
+                                StartToEnd -> {}
+                                EndToStart -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Archive,
+                                            contentDescription = "Archive"
+                                        )
+                                    }
+                                }
+
+                                Settled -> {}
+                            }
+                        },
+                    ) {
+                        AndroidView(
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            factory = { context ->
+                                val view = LayoutInflater.from(context).inflate(
+                                    R.layout.conversation_list_item_view, null, false
+                                ) as ConversationListItemView
+                                view.bind(listItem, hostInterface)
+                                view
+                            }
+                        )
+                    }
                 }
             }
         }
