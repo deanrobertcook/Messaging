@@ -138,25 +138,24 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
     }
 
     override fun isSwipeAnimatable(): Boolean {
-        Log.d(LogUtil.BUGLE_TAG, "isSwipeAnimatable")
         return false
     }
 
     override fun getSnackBarInteractions(): List<SnackBarInteraction> {
-        Log.d(LogUtil.BUGLE_TAG, "getSnackBarInteractions")
         return emptyList<SnackBarInteraction>()
     }
 
     override fun startFullScreenPhotoViewer(initialPhoto: Uri, initialPhotoBounds: Rect, photosUri: Uri) {
-        Log.d(LogUtil.BUGLE_TAG, "startFullScreenPhotoViewer")
+        UIIntents.get().launchFullScreenPhotoViewer(
+            getActivity(), initialPhoto, initialPhotoBounds, photosUri
+        )
     }
 
     override fun startFullScreenVideoViewer(videoUri: Uri) {
-        Log.d(LogUtil.BUGLE_TAG, "startFullScreenVideoViewer")
+        UIIntents.get().launchFullScreenVideoViewer(getActivity(), videoUri)
     }
 
     override fun isSelectionMode(): Boolean {
-        Log.d(LogUtil.BUGLE_TAG, "isSelectionMode")
         return !viewModel.uiState.value.selectedIds.isEmpty()
     }
 }
