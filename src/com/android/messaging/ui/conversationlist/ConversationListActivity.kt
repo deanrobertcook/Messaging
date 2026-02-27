@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -215,33 +216,62 @@ fun ConversationList(
                         Text("Messaging")
                     },
                     actions = {
-                        var expanded by remember { mutableStateOf(false) }
-                        IconButton(onClick = { expanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Archived") },
-                                onClick = {
-                                    UIIntents.get().launchArchivedConversationsActivity(context)
+                        if (uiState.selectedIds.isEmpty()) {
+                            var expanded by remember { mutableStateOf(false) }
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            }
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Archived") },
+                                    onClick = {
+                                        UIIntents.get().launchArchivedConversationsActivity(context)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Settings") },
+                                    onClick = {
+                                        UIIntents.get().launchSettingsActivity(context)
+                                    }
+                                )
+                            }
+                        } else {
+                            IconButton(onClick = {
+                                for (conversationId in uiState.selectedIds) {
+                                    UpdateConversationArchiveStatusAction.archiveConversation(conversationId)
                                 }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings") },
-                                onClick = {
-                                    UIIntents.get().launchSettingsActivity(context)
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "" + uiState.selectedIds.size + " archived",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        for (conversationId in uiState.selectedIds) {
+                                            UpdateConversationArchiveStatusAction.unarchiveConversation(conversationId)
+                                        }
+                                    }
                                 }
-                            )
+                            }) {
+                                Icon(Icons.Default.Archive, contentDescription = "Archive")
+                            }
+
+                            IconButton(onClick = {
+
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            }
+
                         }
                     }
                 )
             },
             floatingActionButton = {
                 FloatingActionButton(onClick = {
-                    UIIntents.get().launchCreateNewConversationActivity(context, null);
+                    UIIntents.get().launchCreateNewConversationActivity(context, null)
                 }) {
                     Icon(Icons.Default.Add, contentDescription = "Add")
                 }
