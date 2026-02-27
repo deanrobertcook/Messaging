@@ -111,6 +111,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose) 
+
     implementation(project(":lib:platform_frameworks_opt_chips"))
     implementation(project(":lib:platform_frameworks_opt_photoviewer"))
     implementation(project(":lib:platform_frameworks_opt_vcard"))

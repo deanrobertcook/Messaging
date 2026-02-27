@@ -361,12 +361,15 @@ public class ConversationListItemView extends FrameLayout implements OnClickList
      */
     public void bind(final Cursor cursor, final HostInterface hostInterface) {
         mData.bind(cursor);
-		this.bind(mData, hostInterface);
+        final boolean isSelected = hostInterface.isConversationSelected(mData.getConversationId());
+		final boolean isSelectionMode = hostInterface.isSelectionMode();
+		this.bind(mData, hostInterface, isSelected, isSelectionMode);
 	}
 
-	public void bind(ConversationListItemData data, final HostInterface hostInterface) {
-        // Update our UI model
+	public void bind(ConversationListItemData data, 
+		final HostInterface hostInterface, boolean isSelected, boolean isSelectionMode) {
         mHostInterface = hostInterface;
+        // Update our UI model
 		mData = data;
         resetAnimatingState();
 
@@ -436,7 +439,6 @@ public class ConversationListItemView extends FrameLayout implements OnClickList
             }
         }
 
-        final boolean isSelected = mHostInterface.isConversationSelected(mData.getConversationId());
         setSelected(isSelected);
         Uri iconUri = null;
         int contactIconVisibility = GONE;
@@ -459,8 +461,8 @@ public class ConversationListItemView extends FrameLayout implements OnClickList
                 mData.getParticipantLookupKey(), mData.getOtherParticipantNormalizedDestination());
         mContactIconView.setVisibility(contactIconVisibility);
         mContactIconView.setOnLongClickListener(this);
-        mContactIconView.setClickable(!mHostInterface.isSelectionMode());
-        mContactIconView.setLongClickable(!mHostInterface.isSelectionMode());
+        mContactIconView.setClickable(!isSelectionMode);
+        mContactIconView.setLongClickable(!isSelectionMode);
 
         mContactCheckmarkView.setVisibility(checkmarkVisiblity);
         mFailedStatusIconView.setVisibility(failStatusVisiblity);

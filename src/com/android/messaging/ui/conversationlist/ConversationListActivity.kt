@@ -69,14 +69,30 @@ import com.android.messaging.ui.UIIntents
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
-    private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this);
+    private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this)
     private val mArchiveMode = false
+
+    private val viewModel: ConversationListViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mListBinding.bind(DataModel.get().createConversationListData(this, this, mArchiveMode))
         mListBinding.getData().init(LoaderManager.getInstance(this), mListBinding)
+
+        setContent {
+            ConversationList(viewModel, this, this)
+        }
     }
 
     override fun onDestroy() {
@@ -88,19 +104,12 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
      * ConversationListDataListener
      **/
     override fun onConversationListCursorUpdated(data: ConversationListData, cursor: Cursor) {
-        if (!cursor.moveToFirst()) {
-            // TODO: empty list
-            return
-        }
-
+        Log.d(LogUtil.BUGLE_TAG, "onConversationListCursorUpdated " + cursor.getCount())
         val listItems = mutableListOf<ConversationListItemData>()
-        do {
+        while (cursor.moveToNext()) {
             listItems.add(ConversationListItemData().apply { this.bind(cursor) })
-        } while (cursor.moveToNext())
-
-        setContent {
-            ConversationList(listItems, this, this)
         }
+        viewModel.onItemsLoaded(listItems)
     }
 
     override fun setBlockedParticipantsAvailable(blockedAvailable: Boolean) {
@@ -111,16 +120,21 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
      * ConversationListItemView.HostInterface
      **/
     override fun isConversationSelected(conversationId: String): Boolean {
-        Log.d(LogUtil.BUGLE_TAG, "isConversationSelected")
-        return false
+        return viewModel.uiState.value.selectedIds.contains(conversationId)
     }
 
     override fun onConversationClicked(
-        conversationListItemData: ConversationListItemData?,
+        conversationListItemData: ConversationListItemData,
         isLongClick: Boolean,
         conversationView: ConversationListItemView
     ) {
-        Log.d(LogUtil.BUGLE_TAG, "onConversationClicked")
+        val conversationId = conversationListItemData.getConversationId()
+        val selectedIds = viewModel.uiState.value.selectedIds
+        if (selectedIds.isEmpty() && !isLongClick) {
+            UIIntents.get().launchConversationActivity(this, conversationId, null, null, false)
+        } else {
+            viewModel.onClick(conversationId)
+        }
     }
 
     override fun isSwipeAnimatable(): Boolean {
@@ -143,13 +157,44 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
 
     override fun isSelectionMode(): Boolean {
         Log.d(LogUtil.BUGLE_TAG, "isSelectionMode")
-        return false
+        return !viewModel.uiState.value.selectedIds.isEmpty()
     }
 }
 
+class ConversationListViewModel : ViewModel() {
+
+    private val _uiState = MutableStateFlow(ConversationListState())
+    val uiState: StateFlow<ConversationListState> = _uiState.asStateFlow()
+
+    fun onItemsLoaded(items: List<ConversationListItemData>) {
+        _uiState.update { it.copy(items = items) }
+    }
+
+    fun onClick(conversationId: String) {
+        _uiState.update { state ->
+            val newSelected = if (conversationId in state.selectedIds) {
+                state.selectedIds - conversationId
+            } else {
+                state.selectedIds + conversationId
+            }
+            state.copy(selectedIds = newSelected)
+        }
+    }
+}
+
+data class ConversationListState(
+    val items: List<ConversationListItemData> = emptyList(),
+    val selectedIds: Set<String> = emptySet()
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: HostInterface, context: Context) {
+fun ConversationList(
+    viewModel: ConversationListViewModel = viewModel(),
+    hostInterface: HostInterface,
+    context: Context
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     MainTheme {
         Scaffold(
             topBar = {
@@ -196,7 +241,7 @@ fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: H
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                items(listItems, key = { it.getConversationId() }) { listItem ->
+                items(uiState.items, key = { it.getConversationId() }) { listItem ->
                     val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
                             if (it == EndToStart) {
@@ -233,11 +278,14 @@ fun ConversationList(listItems: List<ConversationListItemData>, hostInterface: H
                             modifier = Modifier
                                 .fillMaxSize(),
                             factory = { context ->
-                                val view = LayoutInflater.from(context).inflate(
+                                LayoutInflater.from(context).inflate(
                                     R.layout.conversation_list_item_view, null, false
                                 ) as ConversationListItemView
-                                view.bind(listItem, hostInterface)
-                                view
+                            },
+                            update = { view ->
+                                val isSelected = uiState.selectedIds.contains(listItem.getConversationId())
+                                val isSelectionMode = !uiState.selectedIds.isEmpty()
+                                view.bind(listItem, hostInterface, isSelected, isSelectionMode)
                             }
                         )
                     }
