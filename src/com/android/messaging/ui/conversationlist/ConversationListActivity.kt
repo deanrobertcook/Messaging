@@ -60,8 +60,13 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
 import androidx.compose.material3.SwipeToDismissBoxValue.Settled
 import androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -78,6 +83,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this)
@@ -147,12 +153,12 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
 
     override fun startFullScreenPhotoViewer(initialPhoto: Uri, initialPhotoBounds: Rect, photosUri: Uri) {
         UIIntents.get().launchFullScreenPhotoViewer(
-            getActivity(), initialPhoto, initialPhotoBounds, photosUri
+            this, initialPhoto, initialPhotoBounds, photosUri
         )
     }
 
     override fun startFullScreenVideoViewer(videoUri: Uri) {
-        UIIntents.get().launchFullScreenVideoViewer(getActivity(), videoUri)
+        UIIntents.get().launchFullScreenVideoViewer(this, videoUri)
     }
 
     override fun isSelectionMode(): Boolean {
@@ -194,6 +200,9 @@ fun ConversationList(
     context: Context
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     MainTheme {
         Scaffold(
             topBar = {
@@ -237,6 +246,7 @@ fun ConversationList(
                     Icon(Icons.Default.Add, contentDescription = "Add")
                 }
             },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -245,6 +255,16 @@ fun ConversationList(
                         confirmValueChange = {
                             if (it == EndToStart) {
                                 UpdateConversationArchiveStatusAction.archiveConversation(listItem.getConversationId())
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "1 archived",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        UpdateConversationArchiveStatusAction.unarchiveConversation(listItem.getConversationId())
+                                    }
+                                }
                                 true
                             } else false
                         }
