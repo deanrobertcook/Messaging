@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -95,16 +96,51 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+
+class ConversationListViewModel : ViewModel() {
+
+    private val _uiState = MutableStateFlow(ConversationListState())
+    val uiState: StateFlow<ConversationListState> = _uiState.asStateFlow()
+
+    fun onItemsLoaded(items: List<ConversationListItemData>) {
+        _uiState.update { it.copy(items = items) }
+    }
+
+    fun onItemClick(conversationId: String) {
+        _uiState.update { state ->
+            val newSelected = if (conversationId in state.selectedIds) {
+                state.selectedIds - conversationId
+            } else {
+                state.selectedIds + conversationId
+            }
+            state.copy(selectedIds = newSelected)
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { state -> state.copy(selectedIds = emptySet()) }
+    }
+
+    fun setDeleteDialog(show: Boolean) {
+        _uiState.update { state -> state.copy(showDeleteDialog = show) }
+    }
+}
+
+data class ConversationListState(
+    val items: List<ConversationListItemData> = emptyList(),
+    val selectedIds: Set<String> = emptySet(),
+    val showDeleteDialog: Boolean = false
+)
 
 class ConversationListActivity : ComponentActivity(), ConversationListDataListener, HostInterface {
     private val mListBinding: Binding<ConversationListData> = BindingBase.createBinding(this)
-    private val mArchiveMode = false
-
     private val viewModel: ConversationListViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        mListBinding.bind(DataModel.get().createConversationListData(this, this, mArchiveMode))
+        val archivedMode = false
+        mListBinding.bind(DataModel.get().createConversationListData(this, this, archivedMode))
         mListBinding.getData().init(LoaderManager.getInstance(this), mListBinding)
 
         setContent {
@@ -150,7 +186,7 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
         if (selectedIds.isEmpty() && !isLongClick) {
             UIIntents.get().launchConversationActivity(this, conversationId, null, null, false)
         } else {
-            viewModel.onClick(conversationId)
+            viewModel.onItemClick(conversationId)
         }
     }
 
@@ -177,35 +213,6 @@ class ConversationListActivity : ComponentActivity(), ConversationListDataListen
     }
 }
 
-class ConversationListViewModel : ViewModel() {
-
-    private val _uiState = MutableStateFlow(ConversationListState())
-    val uiState: StateFlow<ConversationListState> = _uiState.asStateFlow()
-
-    fun onItemsLoaded(items: List<ConversationListItemData>) {
-        _uiState.update { it.copy(items = items) }
-    }
-
-    fun onClick(conversationId: String) {
-        _uiState.update { state ->
-            val newSelected = if (conversationId in state.selectedIds) {
-                state.selectedIds - conversationId
-            } else {
-                state.selectedIds + conversationId
-            }
-            state.copy(selectedIds = newSelected)
-        }
-    }
-
-    fun clearSelection() {
-        _uiState.update { state -> state.copy(selectedIds = emptySet()) }
-    }
-}
-
-data class ConversationListState(
-    val items: List<ConversationListItemData> = emptyList(),
-    val selectedIds: Set<String> = emptySet()
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,84 +224,11 @@ fun ConversationList(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var showDeleteDialog by remember { mutableStateOf(false) }
 
     MainTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    colors = topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.primary,
-                    ),
-                    title = {
-                        if (uiState.selectedIds.isEmpty()) {
-                            Text("Messaging")
-                        }
-                    },
-                    navigationIcon = {
-                        if (!uiState.selectedIds.isEmpty()) {
-                            IconButton(onClick = { viewModel.clearSelection() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close"
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        if (uiState.selectedIds.isEmpty()) {
-                            var expanded by remember { mutableStateOf(false) }
-                            IconButton(onClick = { expanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More")
-                            }
-                            DropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Archived") },
-                                    onClick = {
-                                        UIIntents.get().launchArchivedConversationsActivity(context)
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Settings") },
-                                    onClick = {
-                                        UIIntents.get().launchSettingsActivity(context)
-                                    }
-                                )
-                            }
-                        } else {
-                            IconButton(onClick = {
-                                for (conversationId in uiState.selectedIds) {
-                                    UpdateConversationArchiveStatusAction.archiveConversation(conversationId)
-                                }
-                                val idsToArchive = uiState.selectedIds
-                                viewModel.clearSelection()
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "${idsToArchive.size} archived",
-                                        actionLabel = "Undo",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        for (conversationId in idsToArchive) {
-                                            UpdateConversationArchiveStatusAction.unarchiveConversation(conversationId)
-                                        }
-                                    }
-                                }
-                            }) {
-                                Icon(Icons.Default.Archive, contentDescription = "Archive")
-                            }
-
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                            }
-
-                        }
-                    }
-                )
+                ConversationListTopAppBar(viewModel, snackbarHostState, scope)
             },
             floatingActionButton = {
                 FloatingActionButton(onClick = {
@@ -307,34 +241,12 @@ fun ConversationList(
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
             if (uiState.items.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .paint(
-                                painter = painterResource(id = R.drawable.ic_oobe_conv_list),
-                                contentScale = ContentScale.Crop
-                            )
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Text(
-                        text = "Once you start a new conversation, you'll see it listed here",
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
+                EmptyConversationList()
                 return@Scaffold
             }
-            if (showDeleteDialog) {
+            if (uiState.showDeleteDialog) {
                 AlertDialog(
-                    onDismissRequest = { showDeleteDialog = false },
+                    onDismissRequest = { viewModel.setDeleteDialog(false) },
                     title = {
                         val text = if (uiState.selectedIds.size > 1) {
                             "Delete ${uiState.selectedIds.size} conversations?"
@@ -352,14 +264,14 @@ fun ConversationList(
                                 .forEach { (id, timestamp) ->
                                     DeleteConversationAction.deleteConversation(id, timestamp)
                                 }
-                            showDeleteDialog = false
+                            viewModel.setDeleteDialog(false)
                             viewModel.clearSelection()
                         }) {
                             Text("Delete")
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteDialog = false }) {
+                        TextButton(onClick = { viewModel.setDeleteDialog(false) }) {
                             Text("Cancel")
                         }
                     }
@@ -367,66 +279,188 @@ fun ConversationList(
             }
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 items(uiState.items, key = { it.getConversationId() }) { listItem ->
-                    val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = {
-                            if (it == EndToStart) {
-                                UpdateConversationArchiveStatusAction.archiveConversation(listItem.getConversationId())
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "1 archived",
-                                        actionLabel = "Undo",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        UpdateConversationArchiveStatusAction.unarchiveConversation(listItem.getConversationId())
-                                    }
-                                }
-                                true
-                            } else false
-                        }
-                    )
-                    SwipeToDismissBox(
-                        state = swipeToDismissBoxState,
-                        backgroundContent = {
-                            when (swipeToDismissBoxState.dismissDirection) {
-                                StartToEnd -> {}
-                                EndToStart -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Archive,
-                                            contentDescription = "Archive"
-                                        )
-                                    }
-                                }
-
-                                Settled -> {}
-                            }
-                        },
-                    ) {
-                        AndroidView(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            factory = { context ->
-                                LayoutInflater.from(context).inflate(
-                                    R.layout.conversation_list_item_view, null, false
-                                ) as ConversationListItemView
-                            },
-                            update = { view ->
-                                val isSelected = uiState.selectedIds.contains(listItem.getConversationId())
-                                val isSelectionMode = !uiState.selectedIds.isEmpty()
-                                view.bind(listItem, hostInterface, isSelected, isSelectionMode)
-                            }
-                        )
-                    }
+                    ConversationListItem(listItem, viewModel, snackbarHostState, scope, hostInterface)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConversationListItem(
+    listItem: ConversationListItemData,
+    viewModel: ConversationListViewModel = viewModel(),
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope,
+    hostInterface: HostInterface,
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
+        confirmValueChange = {
+            if (it == EndToStart) {
+                UpdateConversationArchiveStatusAction.archiveConversation(listItem.getConversationId())
+                scope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "1 archived",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        UpdateConversationArchiveStatusAction.unarchiveConversation(listItem.getConversationId())
+                    }
+                }
+                true
+            } else false
+        }
+    )
+    SwipeToDismissBox(
+        state = swipeToDismissBoxState,
+        backgroundContent = {
+            when (swipeToDismissBoxState.dismissDirection) {
+                StartToEnd -> {}
+                EndToStart -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(16.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Archive,
+                            contentDescription = "Archive"
+                        )
+                    }
+                }
+
+                Settled -> {}
+            }
+        },
+    ) {
+        AndroidView(
+            modifier = Modifier
+                .fillMaxSize(),
+            factory = { context ->
+                LayoutInflater.from(context).inflate(
+                    R.layout.conversation_list_item_view, null, false
+                ) as ConversationListItemView
+            },
+            update = { view ->
+                val isSelected = uiState.selectedIds.contains(listItem.getConversationId())
+                val isSelectionMode = !uiState.selectedIds.isEmpty()
+                view.bind(listItem, hostInterface, isSelected, isSelectionMode)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConversationListTopAppBar(
+    viewModel: ConversationListViewModel = viewModel(),
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    TopAppBar(
+        colors = topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.primary,
+        ),
+        title = {
+            if (uiState.selectedIds.isEmpty()) {
+                Text("Messaging")
+            }
+        },
+        navigationIcon = {
+            if (!uiState.selectedIds.isEmpty()) {
+                IconButton(onClick = { viewModel.clearSelection() }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close"
+                    )
+                }
+            }
+        },
+        actions = {
+            if (uiState.selectedIds.isEmpty()) {
+                var expanded by remember { mutableStateOf(false) }
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More")
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Archived") },
+                        onClick = {
+                            UIIntents.get().launchArchivedConversationsActivity(context)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        onClick = {
+                            UIIntents.get().launchSettingsActivity(context)
+                        }
+                    )
+                }
+            } else {
+                IconButton(onClick = {
+                    for (conversationId in uiState.selectedIds) {
+                        UpdateConversationArchiveStatusAction.archiveConversation(conversationId)
+                    }
+                    val idsToArchive = uiState.selectedIds
+                    viewModel.clearSelection()
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "${idsToArchive.size} archived",
+                            actionLabel = "Undo",
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            for (conversationId in idsToArchive) {
+                                UpdateConversationArchiveStatusAction.unarchiveConversation(conversationId)
+                            }
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Archive, contentDescription = "Archive")
+                }
+
+                IconButton(onClick = { viewModel.setDeleteDialog(true) }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EmptyConversationList() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .paint(
+                    painter = painterResource(id = R.drawable.ic_oobe_conv_list),
+                    contentScale = ContentScale.Crop
+                )
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = "Once you start a new conversation, you'll see it listed here",
+            color = Color.Gray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
